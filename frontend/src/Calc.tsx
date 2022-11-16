@@ -1,46 +1,88 @@
-import { KeyboardEventHandler, useReducer, useEffect } from "react";
+import { useReducer, KeyboardEventHandler, ChangeEventHandler } from "react";
 import "./Calc.css";
 
 type Action = {
-  type: "Number" | "." | "Enter" | "Backspace" | "Op";
+  type: "Number" | "." | "Enter" | "Backspace" | "Op" | "Clear";
   key?: string;
   operation?: Function;
 };
 
-type State = number[];
+type State = {
+  inputing: boolean;
+  value: string;
+  valueIsResult: boolean;
+  stack: number[];
+};
+
+const defaultState = {
+  inputing: false,
+  value: "0.00",
+  valueIsResult: false,
+  stack: [0, 0, 0],
+};
 
 function reducer(state: State, action: Action): State {
-  const newState = [...state];
-  const last = newState.length - 1;
   const key = action.key ?? "";
+  let stack = [...state.stack];
+  let inputing = state.inputing || false;
+  let value = state.value || "";
+  let valueIsResult = state.valueIsResult;
 
   // console.log(`state: [${state.join(",")}]`);
   // console.log(`action  type: ${action.type}  key: ${action.key}`);
 
   switch (action.type) {
     case "Number":
-      newState[last] = parseFloat(newState[last] + key);
+      if (inputing) {
+        value = value + key;
+      } else {
+        if (valueIsResult) stack.push(parseFloat(value));
+        value = key;
+      }
+      valueIsResult = false;
+      inputing = true;
       break;
     case ".":
-      newState[last] = parseFloat(newState[last] + key + "0");
+      if (inputing) {
+        if (value.indexOf(".") < 0) value = value + key;
+      } else {
+        value = key;
+      }
+      if (valueIsResult) stack.push(parseFloat(value));
+      valueIsResult = false;
+      inputing = true;
       break;
     case "Op":
-      const b = newState.pop() ?? 0;
-      const a = newState.pop() ?? 0;
-      if (action.operation) newState.push(action.operation(a, b));
+      const y = stack.pop() ?? 0;
+      inputing = false;
+      const x = parseFloat(value);
+      valueIsResult = true;
+      if (action.operation) value = action.operation(y, x);
       break;
     case "Backspace":
-      const curValue = String(newState.pop() ?? "");
-      newState.push(
-        parseFloat(curValue.length > 1 ? curValue.slice(0, -1) : "0")
-      );
+      if (inputing) {
+        value = value.slice(0, -1);
+        if ((value = "")) inputing = false;
+      } else {
+        value = "0";
+      }
+      valueIsResult = false;
       break;
     case "Enter":
-      newState.push(0);
+      stack.push(parseFloat(value));
+      valueIsResult = false;
+      inputing = false;
+      break;
+    case "Clear":
+      inputing = false;
+      valueIsResult = false;
+      value = "0";
+      stack = [0, 0, 0];
       break;
   }
 
-  // console.log(`new: [${newState.join(",")}]`);
+  // console.log(`new: [${stack.join(",")}]`);
+  const newState = { inputing, value, valueIsResult, stack };
   return newState;
 }
 
@@ -58,16 +100,24 @@ function divide(a: number, b: number) {
 }
 
 function Calc() {
-  const [stack, dispatch] = useReducer(reducer, [3, 2, 1]);
-  const last = stack.length - 1;
+  const [state, dispatch] = useReducer(reducer, defaultState);
+  const stack = state.stack;
+  const inputing = state.inputing;
+  const value = state.value;
 
-  const handleKey = (e: KeyboardEvent) => {
+  const handleChange: ChangeEventHandler = (e) => {
+    e.preventDefault();
+  };
+
+  const handleKey: KeyboardEventHandler = (e) => {
     e.preventDefault();
     const key = e.key;
     // console.log({ e });
 
     if (isNumeric(key)) {
       dispatch({ type: "Number", key });
+    } else if (key === "c") {
+      dispatch({ type: "Clear" });
     } else if (key === ".") {
       dispatch({ type: ".", key });
     } else if (key === "Enter") {
@@ -85,27 +135,29 @@ function Calc() {
     }
   };
 
-  useEffect(() => {
-    document.addEventListener("keyup", handleKey, false);
-    return () => {
-      document.removeEventListener("keyup", handleKey, false);
-    };
-  }, []);
-
-  // console.log({ stack });
-
-  const t = formatNum(stack.at(-4));
-  const z = formatNum(stack.at(-3));
-  const y = formatNum(stack.at(-2));
-  const v = formatNum(stack.at(-1));
+  const l = stack.length;
+  const t = formatNum(stack[l - 3]);
+  const z = formatNum(stack[l - 2]);
+  const y = formatNum(stack[l - 1]);
+  const x = inputing ? `${value}` : formatNum(parseFloat(value));
 
   return (
     <main id="main">
+      <div>
+        <input
+          type="text"
+          value={x}
+          onKeyUp={handleKey}
+          onChange={handleChange}
+          autoFocus
+        />
+        {/* <div>inputing: {inputing ? "true" : "false"}</div> */}
+        {/* <div>value: {value}</div> */}
+      </div>
       <ul>
         <li>T: {t}</li>
         <li>Z: {z}</li>
         <li>Y: {y}</li>
-        <li>V: {v}</li>
       </ul>
     </main>
   );
