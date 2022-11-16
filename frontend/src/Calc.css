@@ -1,0 +1,20 @@
+
+#main {
+    height: 100%;
+    text-align: center;
+}
+
+ul {
+    list-style: outside none none;
+    width: 20em;
+    margin: 0.5em auto;
+}
+
+li {
+    text-align: right;
+    /* border: 1px solid green; */
+}
+
+li.input {
+    border: 1px solid green;
+}
